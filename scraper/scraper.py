@@ -84,7 +84,7 @@ class Scraper:
                 biggest_url = self._get_biggest_pic_url(urls)
                 meme = Meme(
                     post=post,
-                    picture_index=i if len(pics_urls) > 1 else None,
+                    index=i if len(pics_urls) > 1 else None,
                     picture=self._download_picture(biggest_url)
                 )
                 memes.append(meme)

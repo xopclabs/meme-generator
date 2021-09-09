@@ -47,7 +47,7 @@ class Meme(DeclarativeBase):
     public_id = Column(String(15), nullable=False)
     post_id = Column(String(10), nullable=False)
     picture = Column(BLOB, nullable=False)
-    picture_index = Column(Integer)
+    index = Column(Integer)
     crop_positions = Column(BLOB)
 
     post = relationship('Post', back_populates='pictures')
@@ -68,7 +68,8 @@ class Crop(DeclarativeBase):
     id = Column(Integer, primary_key=True)
     meme_id = Column(Integer, ForeignKey('meme.id'))
     picture = Column(BLOB)
-    crop_index = Column(Integer)
+    index = Column(Integer)
+    text = Column(Text)
 
     base = relationship('Meme', back_populates='crops')
 
@@ -77,8 +78,8 @@ class Crop(DeclarativeBase):
 
 
 # Set up relationships
-Public.posts = relationship('Post', order_by=Post.date, back_populates='public')
-Post.pictures = relationship('Meme', order_by=Meme.picture_index, back_populates='post')
-Meme.crops = relationship('Crop', order_by=Crop.crop_index, back_populates='base')
+Public.posts = relationship('Post', order_by=desc(Post.date), back_populates='public')
+Post.pictures = relationship('Meme', order_by=Meme.index, back_populates='post')
+Meme.crops = relationship('Crop', order_by=Crop.index, back_populates='base')
 
 DeclarativeBase.metadata.create_all(engine)
