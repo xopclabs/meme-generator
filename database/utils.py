@@ -22,12 +22,12 @@ def get_public(id: str=None, domain: str=None) -> Public:
     return public
 
 
-def filter_posts(ids, public_id, count=100):
+def filter_posts(ids, public_id, limit=100):
     '''Filters out existing post ids from a list'''
     session = Session()
     post_ids = session.query(Post.post_id).filter(Post.public_id == public_id) \
                                   .order_by(desc(Post.date)) \
-                                  .limit(count) \
+                                  .limit(limit) \
                                   .all()
 
     post_ids = set(map(lambda x: int(x[0]), post_ids))
