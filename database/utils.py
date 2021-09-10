@@ -1,5 +1,6 @@
 from sqlalchemy import or_, desc
-from database.models import Session, Public, Post
+from database.engine import Session
+from database.models import Public, Post
 
 
 def add_public(id: str, domain: str) -> Public:

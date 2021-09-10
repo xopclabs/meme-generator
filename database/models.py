@@ -1,13 +1,8 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, \
+from sqlalchemy import Column, Integer, String, Text, \
     ForeignKey, ForeignKeyConstraint, desc
 from sqlalchemy.dialects.sqlite import BLOB
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
-
-
-engine = create_engine('sqlite:///memes.db', echo=False)
-Base = declarative_base()
-Session = sessionmaker(bind=engine)
+from sqlalchemy.orm import relationship
+from database.engine import Base, engine
 
 
 class Public(Base):

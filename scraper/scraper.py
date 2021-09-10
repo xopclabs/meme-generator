@@ -3,19 +3,21 @@ import requests
 from os import environ
 from datetime import datetime
 from typing import Tuple, List
-from database.models import Session, Public, Post, Meme
+from database.models import Public, Post, Meme
 from database.utils import filter_posts
+from database.engine import Session
+from scraper.utils import print_stats, accumulate_stats, StatDict
 
 
 class Scraper:
 
-    def __init__(self, public: Public, token: str=None):
+    def __init__(self, public: Public, token: str = None):
         self.public = public
         self._domain = public.domain
         self._owner_id = public.id
         self._token = environ['VKAPI_TOKEN'] if token is None else token
 
-    def _open_session(self) -> None:
+    def _open_api_session(self) -> None:
         self.api_session = vk.Session(access_token=self._token)
         self.api = vk.API(self.api_session, v='5.131', lang='ru', timeout=10)
 
@@ -50,7 +52,7 @@ class Scraper:
         memes = []
 
         for p in response:
-            print(f'{p["owner_id"]}_{p["id"]}:', end=' ')
+            print(f'{self._domain} {p["id"]}:', end=' ')
             # Skip sponsored posts
             if p['marked_as_ads'] == 1:
                 print('[X]')
@@ -92,36 +94,48 @@ class Scraper:
             print()
         return posts, memes
 
-    def _save_to_db(self, posts: List[Post], memes: List[Meme]) -> None:
-        session = Session()
+    def save_to_db(
+            self,
+            posts: List[Post],
+            memes: List[Meme],
+            session: Session = None,
+    ) -> None:
+        shared_session = session is not None
+
+        session = Session() if not shared_session else session
         session.add_all(posts)
         session.add_all(memes)
-        session.commit()
-        session.close()
+        if not shared_session:
+            session.commit()
+            session.close()
 
     def _scrape_pipeline(
             self,
             offset: int = 0,
             count: int = 100,
-            limit: int = 100
-    ) -> dict:
+            limit: int = 100,
+            commit: bool = True,
+    ) -> StatDict:
         response = self._request(offset=offset, count=count)
         response = self._filter_response(response, limit=limit)
         posts, memes = self._parse_posts(response)
         # Create report dict
         pic_size = sum(map(lambda x: len(x.picture) / 1e6, memes))
-        self._save_to_db(posts, memes)
-        return {'n_posts': len(posts), 'n_pics': len(memes), 'size': pic_size}
+        stats = {'n_posts': len(posts), 'n_pics': len(memes), 'size': pic_size}
+        if commit:
+            self.save_to_db(posts, memes)
+            return stats
+        return stats, posts, memes
 
-    def _accumulate_stats(self, stats: dict, report: dict) -> dict:
-        for key in stats.keys():
-            stats[key] += report[key]
-        return stats
-
-    def scrape(self, offset: int = 0, count: int = 100) -> None:
-        # Establish session if it hasn't yet
+    def scrape(
+            self,
+            offset: int = 0,
+            count: int = 100,
+            print_report: bool = True
+    ) -> StatDict:
+        # Establish api session if it hasn't yet
         if not hasattr(self, 'api'):
-            self._open_session()
+            self._open_api_session()
 
         # Split requests into batches of maximum 100 posts
         offsets = range(count - 100, -100, -100)
@@ -129,7 +143,51 @@ class Scraper:
         offsets = list(map(lambda x: max(x, 0), offsets))
 
         stats = {'n_posts': 0, 'n_pics': 0, 'size': 0}
+        # Scrape one request at a time
         for o, c in zip(offsets, counts):
-            report = self._scrape_pipeline(offset=o, count=c, limit=count)
-            stats = self._accumulate_stats(stats, report)
-        print(f'+{stats["n_posts"]} posts, +{stats["n_pics"]} pics ({stats["size"]:.2f} MB)')
+            report = self._scrape_pipeline(
+                offset=o,
+                count=c,
+                limit=count
+            )
+            stats = accumulate_stats(stats, report)
+
+        # Print report
+        if print_report:
+            print_stats(self._domain, stats)
+
+        return stats
+
+    def scrape_return(
+            self,
+            offset: int = 0,
+            count: int = 100,
+            print_report: bool = True
+    ) -> Tuple[StatDict, Post, Meme]:
+        # Establish api session if it hasn't yet
+        if not hasattr(self, 'api'):
+            self._open_api_session()
+
+        # Split requests into batches of maximum 100 posts
+        offsets = range(count - 100, -100, -100)
+        counts = [100 + min(o, 0) for o in offsets]
+        offsets = list(map(lambda x: max(x, 0), offsets))
+
+        stats = {'n_posts': 0, 'n_pics': 0, 'size': 0}
+        posts, memes = [], []
+        # Scrape one request at a time
+        for o, c in zip(offsets, counts):
+            report, p, m = self._scrape_pipeline(
+                offset=o,
+                count=c,
+                limit=count,
+                commit=False
+            )
+            stats = accumulate_stats(stats, report)
+            posts.extend(p)
+            memes.extend(m)
+        # Print report
+        if print_report:
+            print_stats(self._domain, stats)
+
+        return stats, posts, memes
