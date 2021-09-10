@@ -6,11 +6,11 @@ from sqlalchemy.orm import relationship, sessionmaker
 
 
 engine = create_engine('sqlite:///memes.db', echo=False)
-DeclarativeBase = declarative_base()
+Base = declarative_base()
 Session = sessionmaker(bind=engine)
 
 
-class Public(DeclarativeBase):
+class Public(Base):
     __tablename__ = 'public'
 
     id = Column(String(15), primary_key=True)
@@ -20,7 +20,7 @@ class Public(DeclarativeBase):
         return f'<Public: id={self.id}, domain={self.domain}>'
 
 
-class Post(DeclarativeBase):
+class Post(Base):
     __tablename__ = 'post'
 
     public_id = Column(String(15), ForeignKey('public.id'), primary_key=True)
@@ -40,7 +40,7 @@ class Post(DeclarativeBase):
                 f'likes={self.likes}, reposts={self.reposts}, views={self.views}>')
 
 
-class Meme(DeclarativeBase):
+class Meme(Base):
     __tablename__ = 'meme'
 
     id = Column(Integer, primary_key=True)
@@ -62,7 +62,7 @@ class Meme(DeclarativeBase):
                 f'crop_positions={self.crop_positions}>')
 
 
-class Crop(DeclarativeBase):
+class Crop(Base):
     __tablename__ = 'crop'
 
     id = Column(Integer, primary_key=True)
@@ -82,4 +82,4 @@ Public.posts = relationship('Post', order_by=desc(Post.date), back_populates='pu
 Post.pictures = relationship('Meme', order_by=Meme.index, back_populates='post')
 Meme.crops = relationship('Crop', order_by=Crop.index, back_populates='base')
 
-DeclarativeBase.metadata.create_all(engine)
+Base.metadata.create_all(engine)

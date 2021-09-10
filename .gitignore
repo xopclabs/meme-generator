@@ -11,3 +11,5 @@ htmlcov
 *.ipynb
 
 *.db
+
+.grive*
