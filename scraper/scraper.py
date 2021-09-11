@@ -69,7 +69,7 @@ class Scraper:
             # Create new post
             post = Post(
                 public=self.public,
-                post_id=p['id'],
+                id=p['id'],
                 date=self._to_datetime_string(p['date']),
                 text=p['text'],
                 comments=p['comments']['count'],

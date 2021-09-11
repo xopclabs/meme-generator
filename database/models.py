@@ -18,8 +18,8 @@ class Public(Base):
 class Post(Base):
     __tablename__ = 'post'
 
+    id = Column(String(10), primary_key=True)
     public_id = Column(String(15), ForeignKey('public.id'), primary_key=True)
-    post_id = Column(String(10), primary_key=True)
     date = Column(String(30), nullable=False)
     text = Column(Text)
     comments = Column(Integer)
@@ -30,7 +30,7 @@ class Post(Base):
     public = relationship('Public', back_populates='posts')
 
     def __repr__(self):
-        return (f'<Post: id={self.id}, public_id={self.public_id}, post_id={self.post_id}, '
+        return (f'<Post: id={self.id}, public_id={self.public_id}, '
                 f'date={self.date}, text={self.text}, comments={self.comments}, '
                 f'likes={self.likes}, reposts={self.reposts}, views={self.views}>')
 
@@ -48,13 +48,13 @@ class Meme(Base):
     post = relationship('Post', back_populates='pictures')
 
     __table_args__ = (ForeignKeyConstraint(
-        ['public_id', 'post_id'], ['post.public_id', 'post.post_id'],
+        ['public_id', 'post_id'], ['post.public_id', 'post.id'],
         onupdate='CASCADE', ondelete='CASCADE'
     ), {})
 
     def __repr__(self):
-        return (f'<Meme: id={self.id}, post_db_id={self.post_db_id}, picture_index={self.picture_index}, '
-                f'crop_positions={self.crop_positions}>')
+        return (f'<Meme: id={self.id}, public_id={self.public_id}, post_id={self.post_id}, '
+                f'index={self.index}, crop_positions={self.crop_positions}>')
 
 
 class Crop(Base):
@@ -69,7 +69,8 @@ class Crop(Base):
     base = relationship('Meme', back_populates='crops')
 
     def __repr__(self):
-        return f'<Crop: id={self.id}, meme_id={self.meme_id}, crop_index={self.crop_index}>'
+        return (f'<Crop: id={self.id}, meme_id={self.meme_id}, index={self.index}, ',
+                f'text={self.text}>')
 
 
 # Set up relationships

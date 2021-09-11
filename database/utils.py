@@ -13,7 +13,7 @@ def add_public(id: str, domain: str) -> Public:
     return public
 
 
-def get_public(id: str=None, domain: str=None) -> Public:
+def get_public(id: str = None, domain: str = None) -> Public:
     '''Returns public with given id or domain'''
     session = Session()
     public = session.query(Public).filter(
@@ -26,7 +26,7 @@ def get_public(id: str=None, domain: str=None) -> Public:
 def filter_posts(ids, public_id, limit=100):
     '''Filters out existing post ids from a list'''
     session = Session()
-    post_ids = session.query(Post.post_id).filter(Post.public_id == public_id) \
+    post_ids = session.query(Post.id).filter(Post.public_id == public_id) \
                                   .order_by(desc(Post.date)) \
                                   .limit(limit) \
                                   .all()

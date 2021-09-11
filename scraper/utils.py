@@ -1,5 +1,4 @@
 from typing import Dict, Union
-from functools import reduce
 
 
 StatDict = Dict[str, Union[int, float]]
