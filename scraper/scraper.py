@@ -4,7 +4,7 @@ from os import environ
 from datetime import datetime
 from typing import Tuple, List
 from database.models import Public, Post, Meme
-from database.utils import filter_posts
+from database.utils import get_existing_posts
 from database.engine import Session
 from scraper.utils import print_stats, accumulate_stats, StatDict
 
@@ -41,17 +41,23 @@ class Scraper:
         img_data = requests.get(url).content
         return img_data
 
-    def _filter_response(self, response: dict, limit: int = 100) -> dict:
+    def _filter_response(self, response: dict) -> dict:
+        if not hasattr(self, '_existing_posts'):
+            self.existing_posts = get_existing_posts(self.public.id)
+
         ids = [p['id'] for p in response]
-        filtered_ids = filter_posts(ids, self._owner_id, limit=limit)
+        filtered_ids = list(filter(lambda x: x not in self.existing_posts, ids))
         filtered = [p for p in response if p['id'] in filtered_ids]
         return filtered
 
-    def _parse_posts(self, response: dict) -> Tuple[List[Post], List[Meme]]:
+    def _parse_posts(
+            self,
+            response: dict,
+    ) -> Tuple[List[Post], List[Meme]]:
         posts = []
         memes = []
 
-        for p in response:
+        for i, p in enumerate(response):
             print(f'{self._domain} {p["id"]}:', end=' ')
             # Skip sponsored posts
             if p['marked_as_ads'] == 1:
@@ -84,10 +90,15 @@ class Scraper:
             pics_urls = [x['photo'] for x in p['attachments'] if x['type'] == 'photo']
             for i, urls in enumerate(pics_urls):
                 biggest_url = self._get_biggest_pic_url(urls)
+                try:
+                    picture = self._download_picture(biggest_url)
+                except:
+                    print('[X]')
+                    break
                 meme = Meme(
                     post=post,
                     index=i if len(pics_urls) > 1 else None,
-                    picture=self._download_picture(biggest_url)
+                    picture=picture
                 )
                 memes.append(meme)
                 print('[PIC]', end=' ')
@@ -117,7 +128,7 @@ class Scraper:
             commit: bool = True,
     ) -> StatDict:
         response = self._request(offset=offset, count=count)
-        response = self._filter_response(response, limit=limit)
+        response = self._filter_response(response)
         posts, memes = self._parse_posts(response)
         # Create report dict
         pic_size = sum(map(lambda x: len(x.picture) / 1e6, memes))
@@ -138,7 +149,7 @@ class Scraper:
             self._open_api_session()
 
         # Split requests into batches of maximum 100 posts
-        offsets = range(count - 100, -100, -100)
+        offsets = range(count + offset - 100, offset - 100, -100)
         counts = [100 + min(o, 0) for o in offsets]
         offsets = list(map(lambda x: max(x, 0), offsets))
 
@@ -169,7 +180,7 @@ class Scraper:
             self._open_api_session()
 
         # Split requests into batches of maximum 100 posts
-        offsets = range(count - 100, -100, -100)
+        offsets = range(count + offset - 100, offset - 100, -100)
         counts = [100 + min(o, 0) for o in offsets]
         offsets = list(map(lambda x: max(x, 0), offsets))
 
@@ -186,6 +197,7 @@ class Scraper:
             stats = accumulate_stats(stats, report)
             posts.extend(p)
             memes.extend(m)
+
         # Print report
         if print_report:
             print_stats(self._domain, stats)

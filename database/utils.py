@@ -1,4 +1,5 @@
-from sqlalchemy import or_, desc
+from sqlalchemy import desc, or_
+from typing import List
 from database.engine import Session
 from database.models import Public, Post
 
@@ -9,28 +10,23 @@ def add_public(id: str, domain: str) -> Public:
     session = Session()
     session.add(public)
     session.commit()
+    session.expunge_all()
     session.close()
     return public
 
 
 def get_public(id: str = None, domain: str = None) -> Public:
     '''Returns public with given id or domain'''
-    session = Session()
-    public = session.query(Public).filter(
-        or_(Public.id == id, Public.domain == domain)
-    ).one()
-    session.close()
+    with Session() as session:
+        public = session.query(Public).filter(
+            or_(Public.id == id, Public.domain == domain)
+        ).one()
     return public
 
 
-def filter_posts(ids, public_id, limit=100):
-    '''Filters out existing post ids from a list'''
+def get_existing_posts(public_id: int) -> List[int]:
+    '''Returns id's of existing posts'''
     session = Session()
-    post_ids = session.query(Post.id).filter(Post.public_id == public_id) \
-                                  .order_by(desc(Post.date)) \
-                                  .limit(limit) \
-                                  .all()
-
+    post_ids = session.query(Post.id).filter(Post.public_id == public_id).all()
     post_ids = set(map(lambda x: int(x[0]), post_ids))
-    filtered = list(filter(lambda x: x not in post_ids, ids))
-    return filtered
+    return post_ids
