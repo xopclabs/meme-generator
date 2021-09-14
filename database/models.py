@@ -43,7 +43,7 @@ class Meme(Base):
     post_id = Column(String(10), nullable=False)
     picture = Column(BLOB, nullable=False)
     index = Column(Integer)
-    crop_positions = Column(BLOB)
+    crop_positions = Column(Text)
 
     post = relationship('Post', back_populates='pictures')
 
@@ -69,13 +69,28 @@ class Crop(Base):
     base = relationship('Meme', back_populates='crops')
 
     def __repr__(self):
-        return (f'<Crop: id={self.id}, meme_id={self.meme_id}, index={self.index}, ',
+        return (f'<Crop: id={self.id}, meme_id={self.meme_id}, index={self.index}, '
                 f'text={self.text}>')
 
 
 # Set up relationships
-Public.posts = relationship('Post', order_by=desc(Post.date), back_populates='public')
-Post.pictures = relationship('Meme', order_by=Meme.index, back_populates='post')
-Meme.crops = relationship('Crop', order_by=Crop.index, back_populates='base')
+Public.posts = relationship(
+    'Post',
+    order_by=desc(Post.date),
+    back_populates='public',
+    cascade='delete, merge, save-update'
+)
+Post.pictures = relationship(
+    'Meme',
+    order_by=Meme.index,
+    back_populates='post',
+    cascade='delete, merge, save-update'
+)
+Meme.crops = relationship(
+    'Crop',
+    order_by=Crop.index,
+    back_populates='base',
+    cascade='delete, merge, save-update'
+)
 
 Base.metadata.create_all(engine)

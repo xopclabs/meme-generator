@@ -22,11 +22,3 @@ def get_public(id: str = None, domain: str = None) -> Public:
             or_(Public.id == id, Public.domain == domain)
         ).one()
     return public
-
-
-def get_existing_posts(public_id: str) -> List[str]:
-    '''Returns id's of existing posts'''
-    session = Session()
-    post_ids = session.query(Post.id).filter(Post.public_id == public_id).all()
-    post_ids = set(map(lambda x: int(x[0]), post_ids))
-    return post_ids

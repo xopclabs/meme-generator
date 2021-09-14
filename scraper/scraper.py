@@ -4,7 +4,6 @@ from os import environ
 from datetime import datetime
 from typing import Tuple, List
 from database.models import Public, Post, Meme
-from database.utils import get_existing_posts
 from database.engine import Session
 from scraper.utils import print_stats, accumulate_stats, StatDict
 
@@ -43,7 +42,11 @@ class Scraper:
 
     def _filter_response(self, response: dict) -> dict:
         if not hasattr(self, '_existing_posts'):
-            self.existing_posts = get_existing_posts(self.public.id)
+            with Session() as session:
+                post_ids = session.query(Post.id) \
+                                .filter(Post.public == self.public) \
+                                .all()
+                self.existing_posts = set(map(lambda x: int(x[0]), post_ids))
 
         ids = [p['id'] for p in response]
         filtered_ids = list(filter(lambda x: x not in self.existing_posts, ids))
