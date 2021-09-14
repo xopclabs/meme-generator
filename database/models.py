@@ -11,6 +11,12 @@ class Public(Base):
     id = Column(String(15), primary_key=True)
     domain = Column(String(50), primary_key=True)
 
+    posts = relationship(
+        'Post',
+        order_by=desc('Post.date'),
+        back_populates='public',
+        cascade='delete, merge, save-update'
+    )
     def __repr__(self):
         return f'<Public: id={self.id}, domain={self.domain}>'
 
@@ -28,6 +34,12 @@ class Post(Base):
     views = Column(Integer)
 
     public = relationship('Public', back_populates='posts')
+    pictures = relationship(
+        'Meme',
+        order_by='Meme.index',
+        back_populates='post',
+        cascade='delete, merge, save-update'
+    )
 
     def __repr__(self):
         return (f'<Post: id={self.id}, public_id={self.public_id}, '
@@ -46,6 +58,12 @@ class Meme(Base):
     crop_positions = Column(Text)
 
     post = relationship('Post', back_populates='pictures')
+    crops = relationship(
+        'Crop',
+        order_by='Crop.index',
+        back_populates='base',
+        cascade='delete, merge, save-update'
+    )
 
     __table_args__ = (ForeignKeyConstraint(
         ['public_id', 'post_id'], ['post.public_id', 'post.id'],
@@ -72,25 +90,5 @@ class Crop(Base):
         return (f'<Crop: id={self.id}, meme_id={self.meme_id}, index={self.index}, '
                 f'text={self.text}>')
 
-
-# Set up relationships
-Public.posts = relationship(
-    'Post',
-    order_by=desc(Post.date),
-    back_populates='public',
-    cascade='delete, merge, save-update'
-)
-Post.pictures = relationship(
-    'Meme',
-    order_by=Meme.index,
-    back_populates='post',
-    cascade='delete, merge, save-update'
-)
-Meme.crops = relationship(
-    'Crop',
-    order_by=Crop.index,
-    back_populates='base',
-    cascade='delete, merge, save-update'
-)
 
 Base.metadata.create_all(engine)

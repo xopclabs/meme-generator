@@ -24,11 +24,11 @@ class Cropper:
     def _get_image(self, meme: Meme) -> Jpeg:
         return Image.open(BytesIO(meme.picture))
 
-    def _translate_bounds(self, bounds: Bounds) -> Bounds:
+    def _translate_bounds(self, bounds: Bounds, shape: Tuple[int, int]) -> Bounds:
         def translator(bound):
             b = bound[0]
-            xmin, xmax = b[0][0], b[1][0]
-            ymin, ymax = b[0][1], b[-1][1]
+            xmin, xmax = [max(min(x, shape[0]), 0) for x in (b[0][0], b[1][0])]
+            ymin, ymax = [max(min(y, shape[1]), 0) for y in (b[0][1], b[-1][1])]
             return [[[xmin, xmax], [ymin, ymax]], bound[1]]
         return list(map(translator, bounds))
 
@@ -44,13 +44,13 @@ class Cropper:
             crops.append(crop)
         return crops
 
-    def _delete_post(self, post: Post) -> None:
-        self._session.delete(post)
-        self._commit()
+    def _delete_post(self, post_id: str) -> None:
+        self._session.query(Post).filter(Post.id == post_id).delete()
+        self._session.commit()
 
     def _delete_crop(self, crop: Crop) -> None:
         self._session.delete(crop)
-        self._commit()
+        self._session.commit()
 
     def _filter_bounds(self, bounds: List[Bounds]) -> None:
         filters = ['comicbook', 'wowlol']
@@ -76,16 +76,16 @@ class Cropper:
         img = self._get_image(meme)
         # Feed img into ocr
         bounds = self.reader.readtext(
-            img, paragraph=True, y_ths=0.2
+            img, paragraph=True, y_ths=0.25
         )
         # If meme doesn't contain any text (or contain too much), delete post
         if len(bounds) == 0 or len(bounds) > 10:
-            self._delete_post(meme.post)
+            self._delete_post(meme.post_id)
             return
         # Filter out watermarks, etc
         bounds = self._filter_bounds(bounds)
         # Translate bbox from rectangle coords to x,y min-max
-        bounds = self._translate_bounds(bounds)
+        bounds = self._translate_bounds(bounds, img.size)
         # Get crop images
         crop_imgs = self._crop(img, bounds)
         # Create Crop objects and gather all crops information
@@ -111,11 +111,16 @@ class Cropper:
         memes = self._session.query(Meme).join(Crop, isouter=True) \
                                          .group_by(Meme.id) \
                                          .having(func.count(Crop.id) == 0) \
-                                         .limit(200) \
                                          .all()
         return memes
 
     def crop(self) -> None:
         memes = self._get_uncropped_memes()
-        for meme in memes:
-            self.process_meme(meme)
+        for i, meme in enumerate(memes):
+            print(f'[{i}/{len(memes)}]: {meme}')
+            try:
+                self.process_meme(meme)
+            except KeyboardInterrupt:
+                raise
+            except:
+                print('Error!')
