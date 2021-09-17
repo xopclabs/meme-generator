@@ -20,13 +20,12 @@ class Cropper:
         self._session = session if session is not None else Session()
         self.reader = easyocr.Reader(['ru', 'en'])
 
-    def  _get_uncropped_posts(self) -> List[Post]:
-        posts = self._session.query(Post).join(Meme) \
-                                         .join(Crop, isouter=True) \
+    def _get_uncropped_memes(self) -> List[Meme]:
+        memes = self._session.query(Meme).join(Crop, isouter=True) \
                                          .group_by(Meme.id) \
                                          .having(func.count(Crop.id) == 0) \
                                          .all()
-        return posts
+        return memes
 
     def _get_image(self, meme: Meme) -> Jpeg:
         return Image.open(BytesIO(meme.picture))
@@ -57,10 +56,11 @@ class Cropper:
         return crops
 
     def _filter_bounds(self, bounds: List[Bounds]) -> None:
-        filters = ['comicbook', 'wowlol', '@eternalclassic', 'Класс!']
+        filters = ['comicbook', 'wowlol', 'Класс!']
         for f in filters:
             bounds = filter(lambda x: f not in x[1], bounds)
         bounds = filter(lambda x: len(x[1]) > 1, bounds)
+        bounds = filter(lambda x: x[0] != '@', bounds)
         return list(bounds)
 
     def _filter_crops_by_size(self, crops: List[Jpeg], image: Jpeg) -> List[Jpeg]:
@@ -97,6 +97,10 @@ class Cropper:
         self._session.commit()
 
     def crop_meme(self, meme: Meme) -> None:
+        # Check if meme wasn't deleted
+        if not self._session.query(Meme).filter(Meme.id == meme.id).all():
+            return
+        # Load picture
         img = self._get_image(meme)
         # Feed img into ocr
         try:
@@ -142,10 +146,8 @@ class Cropper:
         self._save_crops(crops)
 
     def crop(self) -> None:
-        posts = self._get_uncropped_posts()
-        for i, post in enumerate(posts):
-            memes = self._session.query(Meme).filter(Meme.post_id == post.id).all()
-            for j, meme in enumerate(memes):
-                print((f'[{i + 1}/{len(posts)}][{j + 1}/{len(memes)}] '
-                      f'public_id: {meme.public_id[1:]}, post_id: {meme.post_id}'))
+        memes = self._get_uncropped_memes()
+        for i, meme in enumerate(memes):
+            print((f'[{i + 1}/{len(memes)}] public_id: {meme.public_id[1:]}, '
+                   f'post_id: {meme.post_id}'))
             self.crop_meme(meme)
