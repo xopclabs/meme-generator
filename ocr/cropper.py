@@ -131,11 +131,15 @@ class Cropper:
         crops = []
         bboxes = []
         for i, (crop_img, (bbox, text)) in enumerate(zip(crop_imgs, bounds)):
+            img = self._image_to_bytes(crop_img)
+            w, h = img.size
             crop = Crop(
                 meme_id=meme.id,
-                picture=self._image_to_bytes(crop_img),
+                picture=img,
                 index=i,
-                text=text
+                text=text,
+                width=w,
+                height=h
             )
             crops.append(crop)
             bboxes.append(bbox)

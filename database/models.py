@@ -82,6 +82,8 @@ class Crop(Base):
     id = Column(Integer, primary_key=True)
     meme_id = Column(Integer, ForeignKey('meme.id'))
     picture = Column(BLOB)
+    width = Column(Integer)
+    height = Column(Integer)
     index = Column(Integer)
     text = Column(Text)
 
