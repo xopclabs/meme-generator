@@ -6,7 +6,7 @@ from sqlalchemy import func
 import json
 from io import BytesIO
 from typing import Tuple, List, Dict
-from database.models import Post, Meme, Crop
+from database.models import Post, Meme, Crop, RejectedPost
 from database.engine import Session
 
 
@@ -30,9 +30,13 @@ class Cropper:
     def _get_image(self, meme: Meme) -> Jpeg:
         return Image.open(BytesIO(meme.picture))
 
-    def _delete_post(self, post_id: str) -> None:
+    def _delete_post(self, post_id: str, reason: str = None) -> None:
+        # Fetch post to delete
         post = self._session.query(Post).filter(Post.id == post_id).one()
+        # Add post to RejectedPost
+        rejected = RejectedPost(id=post.id, public_id=post.public_id)
         self._session.delete(post)
+        self._session.add(rejected)
         self._session.commit()
 
     def _translate_bounds(self, bounds: Bounds, shape: Tuple[int, int]) -> Bounds:
@@ -87,11 +91,6 @@ class Cropper:
         image.save(buf, format='JPEG')
         return buf.getvalue()
 
-    def _update_meme_crops_location(self, meme: Meme, bboxes: str) -> None:
-        self._session.query(Meme).filter(Meme.id == meme.id) \
-                           .update({Meme.crop_positions: bboxes})
-        self._session.commit()
-
     def _save_crops(self, crops: List[Crop]) -> None:
         self._session.add_all(crops)
         self._session.commit()
@@ -109,14 +108,14 @@ class Cropper:
             )
         except RuntimeError as e:
             print(e)
-            self._delete_post(meme.post_id)
+            self._delete_post(meme.post_id, reason='OOM')
             return
 
         # Filter out watermarks, etc
         bounds = self._filter_bounds(bounds)
         # If meme doesn't contain any text (or contain too much), delete post
         if len(bounds) not in range(1, 7):
-            self._delete_post(meme.post_id)
+            self._delete_post(meme.post_id, reason='crop-count')
             return
         # Translate bbox from rectangle coords to x,y min-max
         bounds = self._translate_bounds(bounds, img.size)
@@ -125,27 +124,25 @@ class Cropper:
         # Filter crops by size and delete post if nothing left
         crop_imgs = self. _filter_crops_by_size(crop_imgs, img)
         if not crop_imgs:
-            self._delete_post(meme.post_id)
+            self._delete_post(meme.post_id, reason='crop-size')
             return
         # Create Crop objects and gather all crops information
         crops = []
-        bboxes = []
         for i, (crop_img, (bbox, text)) in enumerate(zip(crop_imgs, bounds)):
-            img = self._image_to_bytes(crop_img)
-            w, h = img.size
+            w, h = crop_img.size
             crop = Crop(
                 meme_id=meme.id,
-                picture=img,
+                picture=self._image_to_bytes(crop_img),
                 index=i,
                 text=text,
                 width=w,
-                height=h
+                height=h,
+                position=json.dumps({
+                    'x': bbox[0],
+                    'y': bbox[1]
+                })
             )
             crops.append(crop)
-            bboxes.append(bbox)
-        # Add crop locations to meme
-        bboxes = json.dumps([dict(zip(['x', 'y'], b)) for b in bboxes])
-        self._update_meme_crops_location(meme, bboxes)
         # Add crops
         self._save_crops(crops)
 

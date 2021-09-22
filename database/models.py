@@ -48,6 +48,14 @@ class Post(Base):
                 f'likes={self.likes}, reposts={self.reposts}, views={self.views}>')
 
 
+class RejectedPost(Base):
+    __tablename__ = 'rejected_post'
+
+    id = Column(String(10), primary_key=True)
+    public_id = Column(String(15), ForeignKey('public.id'), primary_key=True)
+    reason = Column(String(30))
+
+
 class Meme(Base):
     __tablename__ = 'meme'
 
@@ -56,7 +64,6 @@ class Meme(Base):
     post_id = Column(String(10), nullable=False)
     picture = Column(BLOB, nullable=False)
     index = Column(Integer)
-    crop_positions = Column(Text)
 
     # post = relationship('Post', backref='pictures')
     crops = relationship(
@@ -81,10 +88,11 @@ class Crop(Base):
 
     id = Column(Integer, primary_key=True)
     meme_id = Column(Integer, ForeignKey('meme.id'))
-    picture = Column(BLOB)
-    width = Column(Integer)
-    height = Column(Integer)
-    index = Column(Integer)
+    picture = Column(BLOB, nullable=False)
+    position = Column(Text, nullable=False)
+    width = Column(Integer, nullable=False)
+    height = Column(Integer, nullable=False)
+    index = Column(Integer, nullable=False)
     text = Column(Text)
 
     # base = relationship('Meme', backref='crops', passive_deletes='all')
