@@ -48,14 +48,6 @@ class Post(Base):
                 f'likes={self.likes}, reposts={self.reposts}, views={self.views}>')
 
 
-class RejectedPost(Base):
-    __tablename__ = 'rejected_post'
-
-    id = Column(String(10), primary_key=True)
-    public_id = Column(String(15), ForeignKey('public.id'), primary_key=True)
-    reason = Column(String(30))
-
-
 class Meme(Base):
     __tablename__ = 'meme'
 

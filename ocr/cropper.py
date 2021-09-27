@@ -3,10 +3,11 @@ import numpy as np
 from PIL import Image
 from PIL.JpegImagePlugin import JpegImageFile as Jpeg
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 import json
 from io import BytesIO
 from typing import Tuple, List, Dict
-from database.models import Post, Meme, Crop, RejectedPost
+from database.models import Post, Meme, Crop
 from database.engine import Session
 
 
@@ -33,10 +34,8 @@ class Cropper:
     def _delete_post(self, post_id: str, reason: str = None) -> None:
         # Fetch post to delete
         post = self._session.query(Post).filter(Post.id == post_id).one()
-        # Add post to RejectedPost
-        rejected = RejectedPost(id=post.id, public_id=post.public_id)
+        # Delete post
         self._session.delete(post)
-        self._session.add(rejected)
         self._session.commit()
 
     def _translate_bounds(self, bounds: Bounds, shape: Tuple[int, int]) -> Bounds:
@@ -97,7 +96,7 @@ class Cropper:
 
     def crop_meme(self, meme: Meme) -> None:
         # Check if meme wasn't deleted
-        if not self._session.query(Meme).filter(Meme.id == meme.id).all():
+        if len(self._session.query(Meme).filter(Meme.id == meme.id).all()) == 0:
             return
         # Load picture
         img = self._get_image(meme)
