@@ -1,49 +1,50 @@
-from sqlalchemy import func
-from scraper.parallelscraper import Scraper, ParallelScraper
+from mixer.mixer import Mixer
+from scraper.parallelscraper import ParallelScraper
 from ocr.cropper import Cropper
-from database.utils import add_public, get_public
-from database.models import Post, Meme, Crop
+from database.utils import add_public
+from database.models import *
 from database.engine import Session
 
 
 if __name__ == '__main__':
-    try:
-        add_public('-166124324', 'poiskmemow')
-        add_public('-95648824', 'memy_pro_kotow')
-        add_public('-129440544', 'eternalclassic')
-        add_public('-150550417', 'reddit')
-        add_public('-120254617', 'dank_memes_ayylmao')
-        add_public('-160814627', 'electromeme')
-        add_public('-140295869', 'degroklassniki')
-        add_public('-67580761', 'countryballs_re')
-        add_public('-57846937', 'mudakoff')
-    except:
-        pass
+    ids = ['-166124324', '-95648824', '-129440544', '-150550417',
+           '-120254617', '-160814627', '-140295869', '-67580761',
+           '-57846937']
+    domains = ['poiskmemow', 'memy_pro_kotow', 'eternalclassic',
+               'reddit', 'dank_memes_ayylmao', 'electromeme',
+               'degroklassniki', 'countryballs_re', 'mudakoff']
+    for i, d in zip(ids, domains):
+        try:
+            add_public(id=i, domain=d)
+        except:
+            pass
+
     plan = {
-        'memy_pro_kotow': 500,
-        'eternalclassic': 500,
-        'reddit': 500,
-        'dank_memes_ayylmao': 500,
-        'poiskmemow': 500,
-        'electromeme': 500,
-        'degroklassniki': 500,
-        'countryballs_re': 500,
-        'mudakoff': 500,
+        'memy_pro_kotow': 300,
+        'eternalclassic': 300,
+        'reddit': 300,
+        'dank_memes_ayylmao': 300,
+        'poiskmemow': 300,
+        'electromeme': 300,
+        'degroklassniki': 300,
+        'countryballs_re': 300,
+        'mudakoff': 300,
     }
-    # scraper = ParallelScraper()
-    # scraper.scrape(plan)
+
+    scraper = ParallelScraper()
+    scraper.scrape(plan)
 
     cropper = Cropper()
-    # cropper.crop()
-    with Session() as s:
-        cropper.process_meme(s.query(Meme).filter(Meme.id == 1).one())
+    cropper.crop()
 
-
-    # s = Session()
-    # memes = s.query(Meme).filter(Meme.index != None).limit(5).all()
-    # for m in memes:
-    #     print(m)
-    #     s.delete(m.post)
-    # s.commit()
-    # print()
-    # print(*memes, sep='\n')
+    for i in range(100):
+        print(f'Mixing {i+1}')
+        mixer = Mixer()
+        base_post, crops = mixer.random_mix(
+            include_publics=['memy_pro_kotow'],
+            exact_pics=2,
+            max_crops=2
+        )
+        memes = mixer.compose(base_post, crops)
+        mixer.save_to_database(base_post, crops, memes)
+        # mixer.save_to_file(memes, f'{i}_test.jpg')

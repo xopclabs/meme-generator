@@ -8,10 +8,12 @@ from PIL import Image
 from typing import List, Union, Dict, Tuple, Callable
 from operator import le, ge, eq, ne
 from io import BytesIO
+from pathlib import Path
 import json
 
 from database.engine import Session
-from database.models import Public, Post, Meme, Crop
+from database.models import GeneratedPost, GeneratedMeme, GeneratedCrop, \
+        Public, Post, Meme, Crop
 
 Operator = Union[le, ge, eq, ne]
 Subqueries = Union[Subquery, List[Subquery]]
@@ -26,6 +28,11 @@ class Mixer:
 
     def __del__(self):
         self._session.close()
+
+    def _image_to_bytes(self, image: Jpeg) -> bytes:
+        buf = BytesIO()
+        image.save(buf, format='JPEG')
+        return buf.getvalue()
 
     def _get_image(self, obj: Union[Meme, Crop]) -> Jpeg:
         return Image.open(BytesIO(obj.picture))
@@ -200,6 +207,18 @@ class Mixer:
         resized = to_resize.resize(size, Image.ANTIALIAS)
         return resized, new_w, new_h
 
+    def _extract_data_from_models(
+            self,
+            base_post: Post,
+            crops: List[Crop]
+    ) -> Tuple[BaseJpegs, CropJpegs, PositionJsonDicts]:
+        # Load base images, crops and convert json strings with positions
+        bases = [self._get_image(m) for m in base_post.pictures]
+        crops = [[self._get_image(c) for c in pic_c] for pic_c in crops]
+        positions = [[self._get_json(c.position) for c in m.crops]
+                     for m in base_post.pictures]
+        return bases, crops, positions
+
     def random_mix(
             self,
             include_publics: List[str] = None,
@@ -216,7 +235,7 @@ class Mixer:
             exact_crops: int = None,
             min_crops: int = None,
             max_crops: int = None
-    ) -> Tuple[BaseJpegs, CropJpegs, PositionJsonDicts]:
+    ) -> Tuple[Post, List[List[Crop]]]:
         '''
         Creates random mix of pictures and location given an exhaustive selection list
 
@@ -236,9 +255,8 @@ class Mixer:
             min_crops: minimum number of crops in meme to look for
             max_crops: maximum number of crops in meme to look for
         Returns:
-            bases: list of base pictures in post
-            crops: list of crops for each base picture in post
-            positions: list of json dicts with positions for each post
+            base_post: base post with base images
+            crops: list of crop models for each base picture in post
         '''
         # Create picture count filter subqueries
         pics_filters = self._get_pics_filters(exact_pics, min_pics, max_pics)
@@ -299,32 +317,27 @@ class Mixer:
                     )
                 # Append j'th crop from j'th sample
                 crop = sample.pictures[min(i, len(sample.pictures)) - 1].crops[j]
-                picture_crops.append(self._get_image(crop))
+                picture_crops.append(crop)
             # Save crop
             crops.append(picture_crops)
 
-        # Load base images and convert json strings with positions
-        bases = [self._get_image(m) for m in base_post.pictures]
-        positions = [[self._get_json(c.position) for c in m.crops]
-                     for m in base_post.pictures]
-        return bases, crops, positions
+        return base_post, crops
 
     def compose(
             self,
-            bases: BaseJpegs,
-            all_crops: CropJpegs,
-            all_positions: PositionJsonDicts
+            base_post: Post,
+            crops: List[List[Crop]]
     ) -> List[Jpeg]:
         '''
         Composes a post given random bases, crops and positions
 
         Params:
-            bases: list of base pictures in post
+            base_post: base post
             crops: list of crops for each base picture in post
-            positions: list of json dicts with positions for each post
         Returns:
             outputs: list of composed pictures
         '''
+        bases, all_crops, all_positions = self._extract_data_from_models(base_post, crops)
         outputs = []
         for base, crops, positions in zip(bases, all_crops, all_positions):
             out = base.copy()
@@ -353,3 +366,40 @@ class Mixer:
                 out.paste(resized, (x1, y1, x2, y2))
             outputs.append(out)
         return outputs
+
+    def save_to_database(
+            self,
+            base_post: Post,
+            crops: List[List[Crop]],
+            pictures: List[Jpeg]
+    ) -> None:
+        # Create generated post
+        gen_post = GeneratedPost(
+            base_post_id=base_post.id,
+            base_public_id=base_post.public_id,
+            posted=0
+        )
+        self._session.add(gen_post)
+        self._session.commit()
+        # Create generated memes for each picture in base post
+        gen_memes = [GeneratedMeme(
+            picture=self._image_to_bytes(p),
+            generated_post_id=gen_post.id,
+            index=i if len(pictures) > 1 else None
+        ) for i, p in enumerate(pictures)]
+        self._session.add_all(gen_memes)
+        self._session.commit()
+        # Create generated crops for each crop in each picture in base post
+        gen_crops = [GeneratedCrop(
+            crop_id=crops[i][j].id,
+            generated_meme_id=gen_memes[i].id,
+            index=j
+        ) for i in range(len(crops)) for j in range(len(crops[i]))]
+        self._session.add_all(gen_crops)
+        self._session.commit()
+        # Commit changes
+
+    def save_to_file(self, pictures: List[Jpeg], filename: str) -> None:
+        filename = Path(filename)
+        for i, pic in enumerate(pictures):
+            pic.save(filename.parent / (filename.stem + f'_{i}.jpg'))
