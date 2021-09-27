@@ -1,0 +1,5 @@
+sqlalchemy
+pillow
+pathos
+vk
+easyocr
