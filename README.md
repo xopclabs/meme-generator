@@ -14,6 +14,10 @@ Install requirements
  ``` shell
 pip install -r requirements.txt
 ```
+For scraping to work, one should set VKAPI_TOKEN environment variable
+``` shell
+export VKAPI_TOKEN=%your_token_here%
+```
 Below is an example of scraping, cropping and generating a new meme
 ``` python
 from scraper.parallelscraper import ParallelScraper
