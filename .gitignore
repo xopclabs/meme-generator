@@ -13,3 +13,5 @@ htmlcov
 *.db*
 
 .grive*
+
+vk_config.v2.json

@@ -1,4 +1,4 @@
-import vk
+import vk_api
 import requests
 from os import environ
 from datetime import datetime
@@ -10,15 +10,25 @@ from scraper.utils import print_stats, accumulate_stats, StatDict
 
 class Scraper:
 
-    def __init__(self, public: Public, token: str = None):
+    def __init__(self, public: Public, app_id: str = None, login: str = None, password: str = None):
         self.public = public
         self._domain = public.domain
         self._owner_id = public.id
-        self._token = environ['VKAPI_TOKEN'] if token is None else token
+        self._app_id = environ['VKAPI_APP_ID'] if app_id is None else app_id
+        self._login = environ['VKAPI_LOGIN'] if login is None else login
+        self._password = environ['VKAPI_PASSWORD'] if password is None else password
 
     def _open_api_session(self) -> None:
-        self.api_session = vk.Session(access_token=self._token)
-        self.api = vk.API(self.api_session, v='5.131', lang='ru', timeout=10)
+        self.api_session = vk_api.VkApi(
+            app_id=self._app_id,
+            login=self._login,
+            password=self._password,
+            scope='photos,wall',
+            api_version='5.131'
+        )
+        self.api_session.auth()
+        # self.api = vk_api.API(self.api_session, v='5.131', lang='ru', timeout=10)
+        self.api = self.api_session.get_api()
 
     def _request(self, offset: int = 0, count: int = 100) -> dict:
         response = self.api.wall.get(domain=self._domain, count=count,

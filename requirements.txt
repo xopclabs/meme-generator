@@ -1,5 +1,5 @@
 sqlalchemy
 pillow
 pathos
-vk
+vk_api
 easyocr
