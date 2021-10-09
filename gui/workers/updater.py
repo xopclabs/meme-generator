@@ -8,10 +8,12 @@ class Updater(QObject):
     def __init__(self, plan):
         super().__init__()
         self.plan = plan
-        self.scraper = ParallelScraper()
-        self.cropper = Cropper()
 
     def run(self):
-        self.scraper.scrape(self.plan)
-        self.cropper.crop()
+        print('Scraping...')
+        scraper = ParallelScraper()
+        scraper.scrape(self.plan)
+        print('Cropping...')
+        cropper = Cropper()
+        cropper.crop()
         self.finished.emit()
