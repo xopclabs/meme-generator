@@ -1,7 +1,7 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QGridLayout,
-                               QPushButton)
+from PySide6.QtWidgets import (QWidget, QMessageBox, QVBoxLayout,
+                               QGridLayout, QPushButton, QLabel)
 from PySide6.QtCore import QThread
-from .workers.scraper_worker import ScraperWorker
+from .workers.updater import Updater
 
 
 class MainWidget(QWidget):
@@ -10,13 +10,20 @@ class MainWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.button = QPushButton('Scrape')
-        self.button.pressed.connect(self.scrape)
-
         layout = QVBoxLayout(self)
-        layout.addWidget(self.button)
+        layout.addWidget(QLabel('text'))
+        self.setLayout(layout)
 
-    def scrape(self):
+        # Pop up dialog prompting to update database
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle('meme-generator')
+        dialog.setText('Update database with new posts?')
+        dialog.setStandardButtons(QMessageBox.No | QMessageBox.Yes)
+        button = dialog.exec()
+        if button == QMessageBox.Yes:
+            self.update_database()
+
+    def update_database(self):
         plan = {
             'memy_pro_kotow': 100,
             'eternalclassic': 100,
@@ -27,7 +34,7 @@ class MainWidget(QWidget):
         }
 
         self.thread = QThread()
-        self.worker = ScraperWorker(plan)
+        self.worker = Updater(plan)
         self.worker.moveToThread(self.thread)
 
         self.thread.started.connect(self.worker.run)
@@ -36,9 +43,3 @@ class MainWidget(QWidget):
         self.thread.finished.connect(self.thread.deleteLater)
 
         self.thread.start()
-
-        # Button enabling
-        self.button.setEnabled(False)
-        self.thread.finished.connect(
-            lambda: self.button.setEnabled(True)
-        )
