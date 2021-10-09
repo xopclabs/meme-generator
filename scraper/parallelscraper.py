@@ -1,4 +1,6 @@
-from pathos.multiprocessing import ProcessingPool as Pool
+# from pathos.multiprocessing import ProcessingPool as Pool
+from PySide6.QtCore import QObject, QThread, Signal
+from multiprocessing import Pool
 from typing import Dict, List, Tuple, Union
 from itertools import repeat
 from functools import reduce
@@ -75,7 +77,7 @@ class ParallelScraper:
             with Session() as session:
                 for p, m in zip(posts, memes):
                     session.add_all(p)
-                    session.add_all(p)
+                    session.add_all(m)
                     session.commit()
         # Print report
         print()

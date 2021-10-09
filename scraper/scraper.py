@@ -27,8 +27,9 @@ class Scraper:
             api_version='5.131'
         )
         self.api_session.auth()
-        # self.api = vk_api.API(self.api_session, v='5.131', lang='ru', timeout=10)
         self.api = self.api_session.get_api()
+        # self.api_session = vk.Session(access_token=environ['VKAPI_TOKEN'])
+        # self.api = vk.API(self.api_session, v='5.131', lang='ru', timeout=10)
 
     def _request(self, offset: int = 0, count: int = 100) -> dict:
         response = self.api.wall.get(domain=self._domain, count=count,
