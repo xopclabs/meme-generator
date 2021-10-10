@@ -221,9 +221,9 @@ class Mixer:
 
     def get_random_mix(
             self,
-            include_publics: List[str] = None,
+            from_publics: List[str] = None,
             exclude_publics: List[str] = None,
-            include_posts: List[str] = None,
+            from_posts: List[str] = None,
             exclude_posts: List[str] = None,
             from_date: str = None,
             to_date: str = None,
@@ -265,10 +265,10 @@ class Mixer:
         filter_sqs = pics_filters + crops_filters
 
         # Create public predicate
-        public_predicate = self._get_public_predicate(include_publics, exclude_publics)
+        public_predicate = self._get_public_predicate(from_publics, exclude_publics)
         # Create post predicate
         post_predicate = self._get_post_predicate(
-            include_posts, exclude_posts, from_date, to_date
+            from_posts, exclude_posts, from_date, to_date
         )
         # Create crop predicate
         crop_predicate = self._get_crop_predicate(

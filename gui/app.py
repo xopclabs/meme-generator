@@ -13,7 +13,7 @@ class MainWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.init_ui()
-        # self.mixer = Mixer()
+        self.mixer = Mixer()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -37,19 +37,21 @@ class MainWidget(QWidget):
 
     @Slot()
     def open_image(self):
-        pass
-        # mix = self.mixer.random_mix(
-        #     include_publics=['memy_pro_kotow'],
-        #     max_pics=1
-        # )
-        # buff = BytesIO()
-        # picture = self.mixer.compose(*mix)[0]
-        # picture.thumbnail((600, 600))
-        # picture.save(buff, format='JPEG')
-        # picture_bytes = buff.getvalue()
-        # pixmap = QPixmap()
-        # pixmap.loadFromData(QByteArray(picture_bytes), 'JPEG')
-        # self.imageLabel.setPixmap(pixmap)
+        mix = self.mixer.get_random_mix(
+            from_publics=['electromeme'],
+            exclude_publics=['degroklassniki'],
+            exact_pics=1,
+            max_crops=3
+        )
+        mix = self.mixer.pick_crops(*mix, how='firstonly')
+        buff = BytesIO()
+        picture = self.mixer.compose(*mix)[0]
+        picture.thumbnail((600, 600))
+        picture.save(buff, format='JPEG')
+        picture_bytes = buff.getvalue()
+        pixmap = QPixmap()
+        pixmap.loadFromData(QByteArray(picture_bytes), 'JPEG')
+        self.imageLabel.setPixmap(pixmap)
 
 
     def update_database(self):
