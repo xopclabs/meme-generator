@@ -31,20 +31,21 @@ if __name__ == '__main__':
         'mudakoff': 300,
     }
 
-    scraper = ParallelScraper()
-    scraper.scrape(plan)
+    # scraper = ParallelScraper()
+    # scraper.scrape(plan)
 
-    cropper = Cropper()
-    cropper.crop()
+    # cropper = Cropper()
+    # cropper.crop()
 
     for i in range(100):
         print(f'Mixing {i+1}')
         mixer = Mixer()
-        base_post, crops = mixer.random_mix(
+        base_post, posts = mixer.get_random_mix(
             include_publics=['memy_pro_kotow'],
-            exact_pics=2,
-            max_crops=2
+            exact_pics=1,
+            max_crops=3
         )
+        base_post, crops = mixer.pick_crops(base_post, posts, how='firstonly')
         memes = mixer.compose(base_post, crops)
         mixer.save_to_database(base_post, crops, memes)
         # mixer.save_to_file(memes, f'{i}_test.jpg')

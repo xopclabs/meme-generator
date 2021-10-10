@@ -219,7 +219,7 @@ class Mixer:
                      for m in base_post.pictures]
         return bases, crops, positions
 
-    def random_mix(
+    def get_random_mix(
             self,
             include_publics: List[str] = None,
             exclude_publics: List[str] = None,
@@ -236,8 +236,7 @@ class Mixer:
             min_crops: int = None,
             max_crops: int = None
     ) -> Tuple[Post, List[List[Crop]]]:
-        '''
-        Creates random mix of pictures and location given an exhaustive selection list
+        """Create random mix of pictures and location given an exhaustive selection list.
 
         Params:
             include_publics: list of publics to select from
@@ -256,8 +255,8 @@ class Mixer:
             max_crops: maximum number of crops in meme to look for
         Returns:
             base_post: base post with base images
-            crops: list of crop models for each base picture in post
-        '''
+            posts: list of post models for each base picture in post
+        """
         # Create picture count filter subqueries
         pics_filters = self._get_pics_filters(exact_pics, min_pics, max_pics)
         # Create crop count filter subqueries
@@ -283,11 +282,11 @@ class Mixer:
             crop_predicate=crop_predicate,
             subquery_filters=filter_sqs
         )
-        # Fetch random crops
-        crops = []
+        # Fetch random posts
+        posts = []
         # For each picture in base post
         for i, base_picture in enumerate(base_post.pictures):
-            picture_crops = []
+            picture_posts = []
             # and for each crop in picture
             for j, crop in enumerate(base_picture.crops):
                 # Sample a random post that is:
@@ -315,12 +314,46 @@ class Mixer:
                         crop_predicate=crop_predicate,
                         subquery_filters=crops_filters + [base_crops_count_f]
                     )
-                # Append j'th crop from j'th sample
-                crop = sample.pictures[min(i, len(sample.pictures)) - 1].crops[j]
-                picture_crops.append(crop)
+                picture_posts.append(sample)
             # Save crop
-            crops.append(picture_crops)
+            posts.append(picture_posts)
 
+        return base_post, posts
+
+    def pick_crops(
+            self,
+            base_post: Post,
+            posts: List[List[Post]],
+            how: str = 'abstract'
+    ) -> Tuple[Post, List[List[Crop]]]:
+        """Pick crops from random mix.
+        Parameter `how` describes method of picking crops:
+            `abstract` -- the way "abstract humour" did it (i'th crop is taken from i'th picture)
+            `firstonly` -- omit everything but the first crop in each picture, take all crops from it
+
+        Params:
+            base_post: base post with base images
+            posts: list of post models for each base picture in post
+        Returns:
+            base_post: base post with base images
+            crops: list of crop models for each base picture in post
+        """
+        crops = []
+        # For each picture in base post
+        for i, picture_posts in enumerate(posts):
+            if how == 'abstract':
+                picture_crops = []
+                for j, crop_post in enumerate(picture_posts):
+                    pic_idx = min(i, len(crop_post.pictures)) - 1
+                    crop = crop_post.pictures[pic_idx].crops[j]
+                    picture_crops.append(crop)
+                crops.append(picture_crops)
+            elif how == 'firstonly':
+                post = picture_posts[0]
+                pic_idx = min(i, len(post.pictures)) - 1
+                crops.append(post.pictures[pic_idx].crops)
+            else:
+                raise ValueError(f'Undefined picking method {how} for `how`')
         return base_post, crops
 
     def compose(
@@ -328,15 +361,14 @@ class Mixer:
             base_post: Post,
             crops: List[List[Crop]]
     ) -> List[Jpeg]:
-        '''
-        Composes a post given random bases, crops and positions
+        """Compose a post given random bases, crops and positions.
 
         Params:
             base_post: base post
             crops: list of crops for each base picture in post
         Returns:
             outputs: list of composed pictures
-        '''
+        """
         bases, all_crops, all_positions = self._extract_data_from_models(base_post, crops)
         outputs = []
         for base, crops, positions in zip(bases, all_crops, all_positions):
