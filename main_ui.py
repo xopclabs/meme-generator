@@ -7,7 +7,7 @@ if __name__ == "__main__":
     app = QApplication([])
 
     widget = MainWidget()
-    widget.resize(800, 600)
+    widget.resize(700, 600)
     widget.window_title = 'meme-generate'
     widget.show()
 
