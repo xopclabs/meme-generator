@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, QThread, Slot, QByteArray
 from PySide6.QtGui import QPixmap, QKeySequence, QShortcut
 from io import BytesIO
 from typing import List
-from .workers.updater import Updater, QtMixer
+from .workers import Updater, QtMixer
 from mixer.mixer import Mixer
 
 
@@ -16,18 +16,16 @@ class MainWidget(QWidget):
         super().__init__()
         # Meme mixer instance
         self.mixer = Mixer()
-        # Pregenerated posts list for snappy UX
-        self.posts_idx = 0
-        self.posts = []
-        self.pixmaps = []
-        for _ in range(5):
-            self._generate_post()
-        # Pixmaps of current post
         # Initializing all of gui
         self.init_ui()
+        # Pregenerating posts list for snappy UX
+        self.post_idx = 0
+        self.posts = []
+        for _ in range(5):
+            self._generate_post(parallel=False)
         # Preload first post
         self.pixmaps_idx = 0
-        self._set_pixmaps()
+        self._set_pixmap()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -71,7 +69,7 @@ class MainWidget(QWidget):
         # dialog.setStandardButtons(QMessageBox.No | QMessageBox.Yes)
         # button = dialog.exec()
         # if button == QMessageBox.Yes:
-        #     self.update_database()
+        #     self._update_database()
 
     def _update_database(self):
         plan = {
@@ -83,80 +81,100 @@ class MainWidget(QWidget):
             'mudakoff': 100,
         }
 
-        self.thread = QThread()
-        self.worker = Updater(plan)
-        self.worker.moveToThread(self.thread)
+        self.updateThread = QThread(self)
+        self.updateWorker = Updater(plan)
+        self.updateWorker.moveToThread(self.updateThread)
+        self.updateThread.started.connect(self.updateWorker.run)
+        self.updateWorker.finished.connect(self.updateWorker.deleteLater)
+        self.updateThread.finished.connect(self.updateThread.deleteLater)
+        self.updateThread.start()
 
-        self.thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
+    def _generate_post(self, parallel=True):
+        mix_params = {
+            'exclude_publics': ['degroklassniki'],
+            'exact_pics': 1,
+            'max_crops': 3
+        }
 
-        self.thread.start()
+        if parallel:
+            self.mixerThread = QThread(self)
+            self.MixerWorker = QtMixer(self.mixer, mix_params)
+            self.MixerWorker.moveToThread(self.mixerThread)
+            self.mixerThread.started.connect(self.MixerWorker.run)
+            self.MixerWorker.post.connect(lambda p: self.posts.append(p))
+            self.MixerWorker.finished.connect(self.MixerWorker.deleteLater)
+            self.mixerThread.start()
+        else:
+            mix = self.mixer.get_random_mix(**mix_params)
+            mix = self.mixer.pick_crops(*mix, how='firstonly')
+            post = self.mixer.compose(*mix)
+            self.posts.append(post)
 
-    def _generate_post(self):
-        mix = self.mixer.get_random_mix(
-            exclude_publics=['degroklassniki'],
-            exact_pics=2,
-            max_crops=3
-        )
-        mix = self.mixer.pick_crops(*mix, how='firstonly')
-        post = self.mixer.compose(*mix)
-        pixmaps = []
-        for m in post:
-            buff = BytesIO()
-            m.thumbnail((600, 600))
-            m.save(buff, format='JPEG')
-            picture_bytes = buff.getvalue()
-            pixmap = QPixmap()
-            pixmap.loadFromData(QByteArray(picture_bytes), 'JPEG')
-            pixmaps.append(pixmap)
-        self.pixmaps.append(pixmaps)
-        self.posts.append(post)
-        print(len(self.posts))
-
-    def _set_pixmaps(self):
-        self.imageLabel.setPixmap(self.pixmaps[self.posts_idx][self.pixmaps_idx])
+    def _set_pixmap(self):
+        img = self.posts[self.post_idx][self.pixmaps_idx]
+        buff = BytesIO()
+        img.thumbnail((600, 600))
+        img.save(buff, format='JPEG')
+        picture_bytes = buff.getvalue()
+        pixmap = QPixmap()
+        pixmap.loadFromData(QByteArray(picture_bytes), 'JPEG')
+        self.imageLabel.setPixmap(pixmap)
 
     def _update_nav_buttons(self):
-        if self.pixmaps_idx == 0:
+        if len(self.posts[self.post_idx]) == 1:
+            self.prevPixmapButton.setEnabled(False)
+            self.nextPixmapButton.setEnabled(False)
+        elif self.pixmaps_idx == 0:
             self.prevPixmapButton.setEnabled(False)
             self.nextPixmapButton.setEnabled(True)
-        elif self.pixmaps_idx == len(self.pixmaps) - 1:
+        elif self.pixmaps_idx == len(self.posts[self.post_idx]) - 1:
             self.prevPixmapButton.setEnabled(True)
-            self.nextPixmapButton.setEnabled(False)
-        elif len(self.pixmaps) == 1:
-            self.prevPixmapButton.setEnabled(False)
             self.nextPixmapButton.setEnabled(False)
         else:
             self.prevPixmapButton.setEnabled(True)
             self.nextPixmapButton.setEnabled(True)
 
     @Slot()
-    def prev_post(self):
-        self.post_idx = max(0, self.posts_idx - 1)
-        self.pixmaps_idx = 0
-        self._set_pixmaps()
-        self._update_nav_buttons()
-
-    @Slot()
-    def next_post(self):
-        self.posts_idx += 1
-        self._generate_post()
-        self.pixmaps_idx = 0
-        self._set_pixmaps()
-        self._update_nav_buttons()
-
-    @Slot()
     def prev_image(self):
+        # Update indices
         self.pixmaps_idx = max(0, self.pixmaps_idx - 1)
-        self._set_pixmaps()
+        # Set new image
+        self._set_pixmap()
+        # Update buttons
         self._update_nav_buttons()
 
     @Slot()
     def next_image(self):
+        # Update indices
         self.pixmaps_idx = min(
-            len(self.pixmaps) - 1,
+            len(self.posts[self.post_idx]) - 1,
             self.pixmaps_idx + 1
         )
-        self._set_pixmaps()
+        # Set new image
+        self._set_pixmap()
+        # Update buttons
+        self._update_nav_buttons()
+
+    @Slot()
+    def prev_post(self):
+        # Update indices
+        self.post_idx = max(0, self.post_idx - 1)
+        self.pixmaps_idx = 0
+        print(self.post_idx)
+        # Set new image
+        self._set_pixmap()
+        # Update buttons
+        self._update_nav_buttons()
+
+    @Slot()
+    def next_post(self):
+        if self.post_idx >= len(self.posts) - 2:
+            self._generate_post()
+            self.posts.pop(0)
+        else:
+            self.post_idx += 1
+        self.pixmaps_idx = 0
+        # Set new image
+        self._set_pixmap()
+        # Update buttons
         self._update_nav_buttons()
