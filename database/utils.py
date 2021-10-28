@@ -22,3 +22,10 @@ def get_public(id: str = None, domain: str = None) -> Public:
             or_(Public.id == id, Public.domain == domain)
         ).one()
     return public
+
+
+def get_public_names() -> List[Public]:
+    '''Returns public with given id or domain'''
+    with Session() as session:
+        publics = session.query(Public).all()
+    return [p.domain for p in publics]

@@ -226,7 +226,7 @@ class Mixer:
             from_posts: List[str] = None,
             exclude_posts: List[str] = None,
             from_date: str = None,
-            to_date: str = None,
+            until_date: str = None,
             include_text: Union[str, List[str]] = None,
             exclude_text: Union[str, List[str]] = None,
             exact_pics: int = None,
@@ -239,12 +239,12 @@ class Mixer:
         """Create random mix of pictures and location given an exhaustive selection list.
 
         Params:
-            include_publics: list of publics to select from
+            from_publics: list of publics to select from
             exclude_publics: list of publics to drop from selection
-            include_publics: list of post id's to select from
-            exclude_publics: list of post id's to drop from selection
+            from_posts: list of post id's to select from
+            exclude_posts: list of post id's to drop from selection
             from_date: limit selection to posts newer than this date
-            to_date: limit selection to posts older than this date
+            until_date: limit selection to posts older than this date
             include_text: list of string to include matches using LIKE in crop texts
             exclude_text: list of string to exclude matches using LIKE in crop texts
             exact_pics: exact number of pics in post to look for
@@ -268,7 +268,7 @@ class Mixer:
         public_predicate = self._get_public_predicate(from_publics, exclude_publics)
         # Create post predicate
         post_predicate = self._get_post_predicate(
-            from_posts, exclude_posts, from_date, to_date
+            from_posts, exclude_posts, from_date, until_date
         )
         # Create crop predicate
         crop_predicate = self._get_crop_predicate(
