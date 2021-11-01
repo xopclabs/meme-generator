@@ -427,9 +427,9 @@ class Mixer:
             generated_meme_id=gen_memes[i].id,
             index=j
         ) for i in range(len(crops)) for j in range(len(crops[i]))]
+        # Commit changes
         self._session.add_all(gen_crops)
         self._session.commit()
-        # Commit changes
 
     def save_to_file(self, pictures: List[Jpeg], filename: str) -> None:
         filename = Path(filename)

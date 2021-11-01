@@ -196,7 +196,7 @@ class MixingSettings(QDialog):
             'from_publics': from_publics,
             'exclude_publics': list(set(self.publics) - set(from_publics)),
             'from_date': self.dateFrom.get_filters(),
-            'to_date': self.dateUntil.get_filters(),
+            'until_date': self.dateUntil.get_filters(),
             'include_text': self.cropsTextInclude.get_filters(),
             'exclude_text': self.cropsTextExclude.get_filters(),
             'min_pics': self.postsFrom.get_filters(),

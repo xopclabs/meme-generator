@@ -1,0 +1,19 @@
+exclude_publics: []
+exclude_text: null
+from_date: null
+from_publics:
+- poiskmemow
+- memy_pro_kotow
+- eternalclassic
+- reddit
+- dank_memes_ayylmao
+- electromeme
+- degroklassniki
+- countryballs_re
+- mudakoff
+include_text: null
+max_crops: null
+max_pics: null
+min_crops: null
+min_pics: null
+until_date: null

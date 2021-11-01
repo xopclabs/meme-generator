@@ -15,7 +15,7 @@ class QtMixer(QObject):
 
     def run(self):
         mix = self.mixer.get_random_mix(**self.mix_params)
-        mix = self.mixer.pick_crops(*mix, how='firstonly')
+        mix = self.mixer.pick_crops(*mix)
         post = self.mixer.compose(*mix)
         self.post.emit(post)
         self.finished.emit()

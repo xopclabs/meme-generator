@@ -1,38 +1,50 @@
-from PySide6.QtWidgets import (QWidget, QMessageBox, QVBoxLayout,
-                               QGridLayout, QPushButton, QLabel)
+from PySide6.QtWidgets import (QMainWindow, QWidget, QMessageBox, QVBoxLayout,
+                               QGridLayout, QPushButton, QLabel, QDialog)
 
-from PySide6.QtCore import Qt, QThread, Slot, QByteArray
+from PySide6.QtCore import Qt, QThread, Slot, Signal, QByteArray
 from PySide6.QtGui import QPixmap, QKeySequence, QShortcut
 from io import BytesIO
-from typing import List
+from typing import List, Dict, Union
 from .workers import Updater, QtMixer
+from .mixing_settings import MixingSettings
+from .utils.config import import_config, export_config
 from mixer.mixer import Mixer
 
 
-class MainWidget(QWidget):
+class MainWidget(QMainWindow):
     """Main window"""
 
     def __init__(self):
         super().__init__()
         # Meme mixer instance
         self.mixer = Mixer()
+        self.mixer_params = import_config() or {}
+        print(f'mixer: {self.mixer_params}')
         # Initializing all of gui
         self.init_ui()
         # Pregenerating posts list for snappy UX
-        self.post_idx = 0
+        self.post_idx = 3
         self.posts = []
-        for _ in range(5):
+        for _ in range(6):
             self._generate_post(parallel=False)
+        print(self.posts)
         # Preload first post
         self.pixmaps_idx = 0
         self._set_pixmap()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        self.setLayout(layout)
+        centralWidget = QWidget()
+        centralWidget.setLayout(layout)
+        self.mixingSettings = MixingSettings(self)
+        self.mixingSettings.changed_params.connect(self.set_mixing_params)
 
         self.imageLabel = QLabel(self, alignment=Qt.AlignCenter)
         layout.addWidget(self.imageLabel)
+
+        self.changeMixingButton = QPushButton(text='Change mixing parameters')
+        self.changeMixingButton.clicked.connect(self.mixingSettings.exec)
+        layout.addWidget(self.changeMixingButton)
 
         buttonLayout = QGridLayout()
 
@@ -47,7 +59,7 @@ class MainWidget(QWidget):
         QShortcut(QKeySequence(Qt.Key_H), self, self.prev_image)
 
         button = QPushButton(text='Save and post')
-        # button.clicked.connect(self.next_post)
+        button.clicked.connect(self.next_post)
         buttonLayout.addWidget(button, 0, 2, 1, 16)
 
         self.nextPixmapButton = QPushButton(text='>')
@@ -61,7 +73,7 @@ class MainWidget(QWidget):
         QShortcut(QKeySequence(Qt.Key_J), self, self.next_post)
 
         layout.addLayout(buttonLayout)
-
+        self.setCentralWidget(centralWidget)
         # Pop up dialog prompting to update database
         # dialog = QMessageBox(self)
         # dialog.setWindowTitle('meme-generator')
@@ -90,23 +102,17 @@ class MainWidget(QWidget):
         self.updateThread.start()
 
     def _generate_post(self, parallel=True):
-        mix_params = {
-            'exclude_publics': ['degroklassniki'],
-            'exact_pics': 1,
-            'max_crops': 3
-        }
-
         if parallel:
             self.mixerThread = QThread(self)
-            self.MixerWorker = QtMixer(self.mixer, mix_params)
-            self.MixerWorker.moveToThread(self.mixerThread)
-            self.mixerThread.started.connect(self.MixerWorker.run)
-            self.MixerWorker.post.connect(lambda p: self.posts.append(p))
-            self.MixerWorker.finished.connect(self.MixerWorker.deleteLater)
+            self.mixerWorker = QtMixer(self.mixer, self.mixer_params)
+            self.mixerWorker.moveToThread(self.mixerThread)
+            self.mixerThread.started.connect(self.mixerWorker.run)
+            self.mixerWorker.post.connect(lambda post: self.posts.append(post))
+            self.mixerWorker.finished.connect(self.mixerWorker.deleteLater)
             self.mixerThread.start()
         else:
-            mix = self.mixer.get_random_mix(**mix_params)
-            mix = self.mixer.pick_crops(*mix, how='firstonly')
+            mix = self.mixer.get_random_mix(**self.mixer_params)
+            mix = self.mixer.pick_crops(*mix)
             post = self.mixer.compose(*mix)
             self.posts.append(post)
 
@@ -133,6 +139,21 @@ class MainWidget(QWidget):
         else:
             self.prevPixmapButton.setEnabled(True)
             self.nextPixmapButton.setEnabled(True)
+
+    @Slot()
+    def open_settings(self):
+        self.mixingSettings.exec()
+
+    @Slot(dict)
+    def set_mixing_params(self, params: Dict[str, Union[str, int]]) -> None:
+        self.mixer_params = params
+        export_config(self.mixer_params)
+        self.posts = []
+        self.post_idx = 0
+        print('set', self.post_idx, len(self.posts))
+        self._generate_post(parallel=False)
+        for _ in range(5):
+            self._generate_post()
 
     @Slot()
     def prev_image(self):
@@ -165,10 +186,11 @@ class MainWidget(QWidget):
         self._set_pixmap()
         # Update buttons
         self._update_nav_buttons()
+        print('prev', self.post_idx, len(self.posts))
 
     @Slot()
     def next_post(self):
-        if self.post_idx >= len(self.posts) - 2:
+        if self.post_idx >= 3:
             self._generate_post()
             self.posts.pop(0)
         else:
@@ -178,3 +200,4 @@ class MainWidget(QWidget):
         self._set_pixmap()
         # Update buttons
         self._update_nav_buttons()
+        print('next', self.post_idx, len(self.posts))
